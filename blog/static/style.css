@@ -1,0 +1,25 @@
+
+.container {
+    margin-top: 10px;
+}
+
+/*ignore container styling on navbar */
+.navbar .container {
+    margin-top: 0px;
+}
+
+#root {
+    margin-top: 20px;
+}
+
+.card {
+    margin: 10px 0px;
+}
+
+.card-footer {
+    font-size: 12px;
+ }
+
+.btn {
+    margin-right: 10px;
+}

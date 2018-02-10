@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container">
+    <div class="row">
+        <div class="col-6 mx-auto">
+            <h3>Login</h3>
+
+            {% if form.errors %}
+            <p>Your username and password didn't match. Please try again.</p>
+            {% endif %}
+
+            {% if next %}
+                {% if user.is_authenticated %}
+                <p>Your account doesn't have access to this page. To proceed,
+                please login with an account that has access.</p>
+                {% else %}
+                <p>Please login to see this page.</p>
+                {% endif %}
+            {% endif %}
+
+
+            <form class="" method="post" action="{% url 'auth:login' %}">
+                {% csrf_token %}
+                {% for field in form %}
+                     <div class="form-group row">
+                        <label class="col-sm-2 col-form-label" for="{{ field.id_for_label }}">{{ field.label_tag }}</label>
+                         <div class="col-sm-10">
+                             <input class="form-control" id="{{ field.id_for_label }}" maxlength="30"
+                                   name="{{ field.html_name }}" value="{{ field.value|default_if_none:'' }}" type="{{field.field.widget.input_type}}" />
+                         </div>
+                        {{ field.errors }}
+                    </div>
+                {% endfor %}
+                <button type="submit"  class="btn btn-primary">Login</button>
+                <input type="hidden" name="next" value="{{ next }}" />
+            </form>
+
+            {# Assumes you setup the password_reset view in your URLconf #}
+            <!--<p><a href="{% url 'auth:password_reset' %}">Lost password?</a></p>-->
+
+        </div>
+    </div>
+</div>
+
+{% endblock content %}
