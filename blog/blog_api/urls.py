@@ -9,5 +9,6 @@ router.register(r'posts', views.PostViewSet)
 
 urlpatterns = [
     url(r'^api/', include(router.urls)),
-    url(r'^$', TemplateView.as_view(template_name = 'index.html'), name='index'),
+    url(r'^api/current_user', views.CurrentUserView.as_view()),
+    url(r'^', TemplateView.as_view(template_name = 'index.html'), name='index'), #all other routes get caught by ReactJS
 ]

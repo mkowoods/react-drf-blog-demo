@@ -27,10 +27,10 @@ class PostsIndex extends React.Component {
                         <p className="card-text">{post.content}</p>
                     </div>
                     <div className="card-footer text-muted">
-                        <div class="float-left">
+                        <div className="float-left">
                             {post.owner && `by ${post.owner}`}
                         </div>
-                        <div class="float-right">
+                        <div className="float-right">
                             {post.create_date}
                         </div>
                     </div>

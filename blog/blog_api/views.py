@@ -6,8 +6,8 @@ from django.shortcuts import render
 # Create your views here.
 
 from .models import Post
-from .serializers import PostSerializer
-from rest_framework import viewsets, permissions, response
+from .serializers import PostSerializer, UserSerializer
+from rest_framework import viewsets, permissions, response, views
 
 
 # Defining Permissions
@@ -21,7 +21,6 @@ class IsOwnerOrReadOnly(permissions.BasePermission):
 
         # Write permissions are only allowed to the owner of the snippet.
         return obj.owner == request.user
-
 
 
 class PostViewSet(viewsets.ModelViewSet):
@@ -40,3 +39,9 @@ class PostViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
+
+
+class CurrentUserView(views.APIView):
+    def get(self, request):
+        serializer = UserSerializer(request.user)
+        return response.Response(serializer.data)

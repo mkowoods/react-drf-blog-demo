@@ -7,14 +7,13 @@ import {Link} from 'react-router-dom';
 
 class PostsDetail extends React.Component {
 
-    //this isnt right but dot if for now
-    componentDidMount(){
-
-        console.log(this.props.post)
-        if( !this.props.post ){
+    componentDidMount() {
+        console.log(this.props.post);
+        if (!this.props.post) {
             const id = this.props.match.params.id;
             this.props.fetchPost(id);
         }
+
     }
 
     handleClickDelete(e){
@@ -23,23 +22,45 @@ class PostsDetail extends React.Component {
 
     }
 
-    render(){
-        if(!this.props.post){
+    renderDetailData(){
+       if(this.props.httpError){
+           return (
+               <Fragment>
+                   <h2>{this.props.httpError.statusText || 'Somehting went Wrong!!'}</h2>
+                   <h6>Code: {this.props.httpError.status}</h6>
+               </Fragment>
+           )
+       }
+        if(this.props.isFetching){
             return <h3>Loading...</h3>;
         }
+
+        if(this.props.post){
+            return (
+                <Fragment>
+                   <h3>{this.props.post.title}</h3>
+                   <h6>{this.props.post.categories}</h6>
+                   <p>{this.props.post.content}</p>
+                </Fragment>
+            )
+        }
+
+
+    }
+
+    render(){
+
         return (
            <div className="container">
                <div className="row">
                    <div className="col-12">
                        <Link className="float-left" to="/"> &lt;&lt; Back to Posts </Link>
-                       <button disabled={!this.props.post.is_owner} className="btn btn-danger float-right" onClick={(e) => this.handleClickDelete(e)}>Delete Post</button>
+                       <button disabled={!this.props.isAuthenticated} className="btn btn-danger float-right" onClick={(e) => this.handleClickDelete(e)}>Delete Post</button>
                    </div>
                </div>
                <div className="row">
                    <div className="col-12" >
-                       <h3>{this.props.post.title}</h3>
-                       <h6>{this.props.post.categories}</h6>
-                       <p>{this.props.post.content}</p>
+                       {this.renderDetailData()}
                    </div>
                </div>
            </div>
@@ -47,9 +68,12 @@ class PostsDetail extends React.Component {
     }
 }
 
-function mapStateToProps({ posts }, ownProps){
+function mapStateToProps({ posts, isFetching, httpError, isAuthenticated, lastRefreshDate }, ownProps){
     return {
         post: posts[ownProps.match.params.id],
+        isFetching,
+        httpError,
+        isAuthenticated
     }
 }
 

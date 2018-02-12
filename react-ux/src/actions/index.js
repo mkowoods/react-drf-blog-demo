@@ -1,4 +1,5 @@
 import _ from "lodash";
+import {getNowInSeconds} from "../util";
 
 //Adapted from: https://docs.djangoproject.com/en/dev/ref/csrf/#ajax
 function getCookie(name){
@@ -6,7 +7,6 @@ function getCookie(name){
     if (document.cookie && document.cookie !== ''){
         const cookies = document.cookie.split(";");
         for(let idx in cookies){
-            //console.log(idx)
             let cookie = _.trim(cookies[idx]);
             if (cookie.substring(0, name.length + 1) === (name + '=')) {
                 cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
@@ -17,28 +17,85 @@ function getCookie(name){
     return cookieValue;
 }
 
-console.log("csrftoken", );
+console.log("csrftoken", getCookie("csrftoken"));
+
+function djangoFetch(url, params={}){
+    //simple overide of django headers need to handle more complex cases
+    let monkeyPatchedParams = {...params};
+    monkeyPatchedParams.credentials = "include";
+    if(!monkeyPatchedParams.headers){monkeyPatchedParams.headers = new Headers()}
+    monkeyPatchedParams.headers.set('Content-Type', "application/json");
+    monkeyPatchedParams.headers.set('X-CSRFToken', getCookie("csrftoken"));
+    return fetch(url, monkeyPatchedParams)
+}
 
 
+//Global Acctions for all fetches
+export const FETCH_REQUEST = 'FETCH_REQUEST';
+export const FETCH_ERROR   = 'FETCH_ERROR';
+export const HISTORY_CHANGED = 'HISTORY_CHANGED';
 
 
-export const FETCH_ALL_POSTS_REQUEST = 'FETCH_ALL_POSTS_REQUEST';
 export const FETCH_ALL_POSTS_SUCCESS = 'FETCH_ALL_POSTS_SUCCESS';
-export const FETCH_ALL_POSTS_ERROR   = 'FETCH_ALL_POSTS_ERROR';
-export const FETCH_POST_REQUEST = 'FETCH_POST_REQUEST';
+
 export const FETCH_POST_SUCCESS = 'FETCH_POST_SUCCESS';
-export const FETCH_POST_ERROR   = 'FETCH_POST_ERROR';
 export const CREATE_POST_SUCCESS = 'CREATE_POST_SUCCESS';
 export const CREATE_POST_ERROR   = 'CREATE_POST_ERROR';
 export const DELETE_POST_SUCCESS = 'DELETE_POST_SUCCESS';
-export const DELETE_POST_ERROR = 'DELETE_POST_ERROR';
+export const CHECK_SESSIONID_COOKIE_SUCCESS = 'SESSIONID_COOKIE_SUCCESS';
+export const CHECK_SESSIONID_COOKIE_FAIURE = 'CHECK_SESSIONID_COOKIE_FAIURE';
 
 
-function fetchAllPostsRequest(){
-    return {
-        type: FETCH_ALL_POSTS_REQUEST
+export const CLEAR_POSTS_CACHE = 'CLEAR_POSTS_CACHE';
+
+function postsAreFresh(state){
+    const expiry = 120; //cache survives for 120 seconds
+    return state.posts && Object.keys(state.posts).length > 0 &&  state.lastRefreshDate > (getNowInSeconds() - expiry)
+}
+
+
+export function clearPostsCacheIfStale(){
+    console.log("clearPostsCacheIfStale called")
+    return (dispatch, getState) => {
+        const state = getState();
+        console.log(state);
+        if (!postsAreFresh(state)) {
+            console.log("Posts No Longer Fresh going to clear posts")
+            dispatch({type: CLEAR_POSTS_CACHE})
+        }
     }
 }
+
+
+function fetchRequest(){
+    return {
+        type: FETCH_REQUEST
+    }
+}
+
+function fetchtError(httpError){
+    console.error("ERROR: fetchPostError", httpError);
+    let {status, statusText} = httpError;
+    return {
+        type: FETCH_ERROR,
+        httpError: {
+            status,
+            statusText
+        } //returns the Response object that raised the error
+    }
+}
+
+
+export function historyChanged(){
+    //function called whenever react router history changes
+    clearPostsCacheIfStale();
+    return {
+        type: HISTORY_CHANGED
+    }
+}
+
+
+
 
 function fetchAllPostsSuccess(payload){
     console.log("fetchAllPostsSuccess", payload)
@@ -48,29 +105,23 @@ function fetchAllPostsSuccess(payload){
     }
 }
 
-function fetchAllPostsError(err){
-    console.error("ERROR: fetchAllPostsError", err);
-    return {
-        type: FETCH_ALL_POSTS_ERROR,
-        err
-    }
-}
+
 
 export function fetchAllPosts(){
     const url = '/api/posts?format=json';
-    return(dispatch) => {
-        dispatch(fetchAllPostsRequest())
+    return (dispatch, getState) => {
+        if(postsAreFresh(getState())){
+            console.log("posts Are Fresh")
+            return;
+        }
+        dispatch(fetchRequest());
         fetch(url, {credentials: "include"}).then(resp => {
             if(!resp.ok){
-                dispatch(fetchAllPostsError(resp));
+                dispatch(fetchtError(resp));
                 return false;
             }
             resp.json().then(json => {
-                if(resp.ok){
-                    dispatch(fetchAllPostsSuccess(json))
-                } else {
-                    dispatch(fetchAllPostsError(json))
-                }
+                dispatch(fetchAllPostsSuccess(json))
             })
         })
     }
@@ -98,14 +149,9 @@ function createPostError(err){
 export function createPost(data, callback){
     const url = '/api/posts';
     return(dispatch) => {
-        fetch(url, {
+        djangoFetch(url, {
             method: 'POST',
             body: JSON.stringify(data),
-            headers: new Headers({
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie("csrftoken")
-            }),
-            credentials: "include"
         }).then(resp => {
             if(!resp.ok){
                 dispatch(createPostError(resp));
@@ -132,34 +178,27 @@ function deletePostSuccess(id){
     }
 }
 
-function deletePostError(){
-    return {type: DELETE_POST_ERROR}
-}
+
 
 export function deletePost(id, callback){
     const url = `/api/posts/${id}`;
-    console.log('deletePost', url)
+    console.log('deletePost', url);
     return(dispatch) => {
-        fetch(url, {
+        dispatch(fetchRequest());
+        djangoFetch(url, {
             method: 'DELETE',
-            headers: new Headers({"X-CSRFToken": getCookie("csrftoken")}),
-            credentials: "include"
         }).then(resp => {
                 if(resp.ok){
                     dispatch(deletePostSuccess(id));
                     callback && callback(); //only execute callback if it exists
                 } else {
-                    dispatch(deletePostError())
+                    dispatch(fetchtError(resp))
                 }
             })
     }
 }
 
-function fetchPostRequest(){
-    return {
-        type: FETCH_POST_REQUEST
-    }
-}
+
 
 function fetchPostSuccess(payload){
     console.log("fetchPostSuccess", payload)
@@ -169,33 +208,62 @@ function fetchPostSuccess(payload){
     }
 }
 
-function fetchPostError(err){
-    console.error("ERROR: fetchPostError", err);
-    return {
-        type: FETCH_POST_ERROR,
-        err
-    }
-}
 
 
 export function fetchPost(id, callback){
     const url = `/api/posts/${id}?format=json`;
-    console.log('fetchPost Called')
+    console.log('fetchPost Called');
     return(dispatch) => {
-        dispatch(fetchPostRequest())
-        fetch(url, {credentials:"include"}).then(resp => {
+        dispatch(fetchRequest());
+        djangoFetch(url).then(resp => {
             if(!resp.ok){
-                dispatch(fetchPostError(resp));
+                dispatch(fetchtError(resp));
                 return false;
             }
             resp.json().then(json => {
-                if(resp.ok){
-                    dispatch(fetchPostSuccess(json))
-                    callback && callback(); //only execute callback if it exists
-                } else {
-                    dispatch(fetchPostError(json))
-                }
+                dispatch(fetchPostSuccess(json))
+                callback && callback(); //only execute callback if it exists
             })
         })
     }
 }
+
+function checkSessionCookieSuccess(payload){
+    console.log(payload);
+    return {
+        type: CHECK_SESSIONID_COOKIE_SUCCESS,
+        payload
+    }
+}
+
+function checkSessionCookieFailure(err){
+    return {
+        type: CHECK_SESSIONID_COOKIE_FAIURE
+    }
+}
+
+
+export function checkAuthentication(){
+    //const session_id = getCookie("sessionid") //valid session id
+    //console.log(session_id)
+    return (dispatch) => {
+        djangoFetch('/api/current_user?format=json').then(resp => {
+            if(!resp.ok){
+                // dispatch(checkSessionCookieFailure(resp));
+                console.error("checkSessionCookieFailure", resp);
+                return false;
+            } else {
+                resp.json().then(json => {
+                    if(json.is_authenticated ){
+                        dispatch(checkSessionCookieSuccess(json))
+                    } else {
+                        dispatch(checkSessionCookieFailure(json))
+                    }
+                })
+            }
+        })
+    }
+}
+
+
+
